@@ -32,6 +32,25 @@ widget_uc_sanitize(uint32_t uc, int *width) {
 	}
 }
 
+int
+widget_str_width(const char *str) {
+	int width = 0;
+
+	if (str) {
+		for (size_t i = 0; str[i];) {
+			int ch_width = 0;
+			uint32_t uc = 0;
+
+			i += (size_t) tb_utf8_char_to_unicode(&uc, &str[i]);
+			widget_uc_sanitize(uc, &ch_width);
+
+			width += ch_width;
+		}
+	}
+
+	return width;
+}
+
 bool
 widget_points_in_bounds(const struct widget_points *points, int x, int y) {
 	return (

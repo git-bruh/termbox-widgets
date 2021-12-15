@@ -18,6 +18,8 @@ struct widget_points {
 
 uint32_t
 widget_uc_sanitize(uint32_t uc, int *width);
+int
+widget_str_width(const char *str);
 bool
 widget_points_in_bounds(const struct widget_points *points, int x, int y);
 void
@@ -86,7 +88,7 @@ enum treeview_event {
 
 struct treeview_node {
 	bool is_expanded; /* Whether it's children are visible. */
-	size_t index;	  /* Index in the **trees array. */
+	size_t index;	  /* Index in the nodes array. */
 	struct treeview_node *parent;
 	struct treeview_node **nodes;
 	void *data; /* Any user data. */
