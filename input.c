@@ -127,7 +127,7 @@ input_finish(struct input *input) {
 }
 
 void
-input_redraw(struct input *input, struct widget_points *points) {
+input_redraw(struct input *input, struct widget_points *points, int *rows) {
 	if (!input || !points) {
 		return;
 	}
@@ -154,6 +154,12 @@ input_redraw(struct input *input, struct widget_points *points) {
 				cur_line = lines;
 			}
 		}
+	}
+
+	/* Don't mess up when coming back to the start after deleting a lot of
+	 * text. */
+	if (lines < max_height) {
+		input->start_y = 0;
 	}
 
 	int diff_forward = cur_line - (input->start_y + max_height);
@@ -209,6 +215,8 @@ input_redraw(struct input *input, struct widget_points *points) {
 
 		line += widget_adjust_xy(width, points, &x, &y);
 	}
+
+	*rows = (lines_fit_in_height ? (line + 1) : max_height);
 }
 
 enum widget_error
