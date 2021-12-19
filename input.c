@@ -106,12 +106,12 @@ buf_delword(struct input *input) {
 }
 
 int
-input_init(struct input *input) {
+input_init(struct input *input, uintattr_t bg, bool scroll_horizontal) {
 	if (!input) {
 		return -1;
 	}
 
-	*input = (struct input) {0};
+	*input = (struct input) {.bg = bg, .scroll_horizontal = scroll_horizontal};
 
 	return 0;
 }
@@ -128,11 +128,66 @@ input_finish(struct input *input) {
 
 void
 input_redraw(struct input *input, struct widget_points *points, int *rows) {
-	if (!input || !points) {
+	if (!input || !points || !rows) {
 		return;
 	}
 
 	size_t buf_len = arrlenu(input->buf);
+
+	if (input->scroll_horizontal) {
+		int width = 0;
+		int max_width = points->x2 - points->x1;
+		int start_width = -1;
+
+		for (size_t i = 0; i < (input->cur_buf + 1) && i < buf_len; i++) {
+			int ch_width = 0;
+			widget_uc_sanitize(input->buf[i], &ch_width);
+
+			width += ch_width;
+		}
+
+		if (width >= max_width) {
+			start_width = width - max_width;
+		}
+
+		int x = points->x1;
+
+		width = 0;
+		size_t start = 0;
+
+		for (; start < buf_len && width <= start_width; start++) {
+			int ch_width = 0;
+			widget_uc_sanitize(input->buf[start], &ch_width);
+
+			width += ch_width;
+		}
+
+		tb_set_cursor(points->x1, points->y1);
+
+		for (size_t i = start; i < buf_len; i++) {
+			int ch_width = 0;
+			uint32_t uc = widget_uc_sanitize(input->buf[i], &ch_width);
+
+			if ((x + ch_width) >= points->x2) {
+				break;
+			}
+
+			if (!widget_should_forcebreak(ch_width)) {
+				tb_set_cell(x, points->y1, uc, TB_DEFAULT, input->bg);
+			}
+
+			x += ch_width;
+
+			if (i + 1 == input->cur_buf) {
+				tb_set_cursor(x, points->y1);
+			}
+
+			assert((widget_points_in_bounds(points, x, points->y1)));
+		}
+
+		*rows = 1;
+		return;
+	}
 
 	int max_height = points->y2 - points->y1;
 	int cur_x = points->x1;
@@ -210,7 +265,7 @@ input_redraw(struct input *input, struct widget_points *points, int *rows) {
 
 		/* Don't print newlines directly as they mess up the screen. */
 		if (!widget_should_forcebreak(width)) {
-			tb_set_cell(x, y - input->start_y, uc, TB_DEFAULT, TB_DEFAULT);
+			tb_set_cell(x, y - input->start_y, uc, TB_DEFAULT, input->bg);
 		}
 
 		line += widget_adjust_xy(width, points, &x, &y);

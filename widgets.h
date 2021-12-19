@@ -47,7 +47,9 @@ enum input_event {
 };
 
 struct input {
+	bool scroll_horizontal;
 	int start_y;
+	uintattr_t bg;
 	size_t cur_buf; /* Current position inside buf. */
 	uint32_t *buf;	/* We use a basic array instead of something like a linked
 					 * list of small arrays  or a gap buffer as pretty much all
@@ -56,7 +58,7 @@ struct input {
 };
 
 int
-input_init(struct input *input);
+input_init(struct input *input, uintattr_t bg, bool scroll_horizontal);
 void
 input_finish(struct input *input);
 /* rows will be filled with the number of rows taken by the input field. */
