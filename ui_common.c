@@ -1,4 +1,5 @@
 #include "widgets.h"
+#include <math.h>
 
 static int
 min(int x, int y) {
@@ -123,12 +124,27 @@ widget_print_str(
 	int width = 0;
 	int original = x;
 
-	while (!(widget_should_scroll(x, WIDGET_CH_MAX, max_x)) && *str) {
+	while (*str) {
 		str += tb_utf8_char_to_unicode(&uc, str);
 		uc = widget_uc_sanitize(uc, &width);
 		tb_set_cell(x, y, uc, fg, bg);
 		x += width;
+
+		if ((widget_should_scroll(x, WIDGET_CH_MAX, max_x))) {
+			break;
+		}
 	}
 
 	return x - original;
+}
+
+int
+widget_pad_center(int part, int total) {
+	int padding = (int) round(((double) (total - part)) / 2);
+
+	if (padding < 0) {
+		return 0;
+	}
+
+	return padding;
 }

@@ -34,6 +34,8 @@ widget_adjust_xy(int width, const struct widget_points *points, int *x, int *y);
 int
 widget_print_str(
   int x, int y, int max_x, uintattr_t fg, uintattr_t bg, const char *str);
+int
+widget_pad_center(int part, int total);
 
 /* Input. */
 enum input_event {
