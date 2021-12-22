@@ -309,25 +309,38 @@ input_handle_event(struct input *input, enum input_event event, ...) {
 
 char *
 input_buf(struct input *input) {
-	const size_t max_codepoint_len = 7;
-	char *buf = NULL;
+	size_t len = arrlenu(input->buf);
+	enum { max_codepoint_len = 6 };
 
-	size_t size
-	  = ((max_codepoint_len * arrlenu(input->buf)) + 1) * sizeof(*buf);
-
-	if ((arrlenu(input->buf)) == 0 || !(buf = malloc(size))) {
+	if (len == 0) {
 		return NULL;
 	}
 
-	size_t buf_index = 0;
+	size_t size = 0;
 
-	for (size_t i = 0, len = arrlenu(input->buf); i < len; i++) {
-		buf_index
-		  += (size_t) tb_utf8_unicode_to_char(&buf[buf_index], input->buf[i]);
-		assert(buf_index < size);
+	char tmp[max_codepoint_len];
+
+	/* Calculate length. */
+	for (size_t i = 0; i < len; i++) {
+		size += (size_t) tb_utf8_unicode_to_char(tmp, input->buf[i]);
 	}
 
-	buf[buf_index] = '\0';
+	if (size == 0) {
+		return NULL;
+	}
+
+	char *buf = malloc((size + 1) * sizeof(*buf));
+
+	if (!buf) {
+		return NULL;
+	}
+
+	for (size_t i = 0, i_utf8 = 0; i < size && i_utf8 < len; i_utf8++) {
+		i += (size_t) tb_utf8_unicode_to_char(&buf[i], input->buf[i_utf8]);
+	}
+
+	/* Original size doesn't include + 1 for NUL so we don't need to subtract. */
+	buf[size] = '\0';
 
 	return buf;
 }
