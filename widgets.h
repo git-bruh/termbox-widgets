@@ -39,7 +39,8 @@ widget_pad_center(int part, int total);
 
 /* Input. */
 enum input_event {
-	INPUT_DELETE = 0,
+	INPUT_CLEAR = 0,
+	INPUT_DELETE,
 	INPUT_DELETE_WORD,
 	INPUT_RIGHT,
 	INPUT_RIGHT_WORD,

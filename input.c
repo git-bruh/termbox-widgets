@@ -276,7 +276,19 @@ input_redraw(struct input *input, struct widget_points *points, int *rows) {
 
 enum widget_error
 input_handle_event(struct input *input, enum input_event event, ...) {
+	if (!input) {
+		return WIDGET_NOOP;
+	}
+
 	switch (event) {
+	case INPUT_CLEAR:
+		if ((arrlenu(input->buf)) == 0) {
+			return WIDGET_NOOP;
+		}
+
+		input->cur_buf = 0;
+		arrsetlen(input->buf, 0);
+		return WIDGET_REDRAW;
 	case INPUT_DELETE:
 		return buf_del(input);
 	case INPUT_DELETE_WORD:
