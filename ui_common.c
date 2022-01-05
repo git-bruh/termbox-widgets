@@ -117,7 +117,7 @@ int
 widget_print_str(
   int x, int y, int max_x, uintattr_t fg, uintattr_t bg, const char *str) {
 	if (!str) {
-		return x;
+		return 0;
 	}
 
 	uint32_t uc = 0;
