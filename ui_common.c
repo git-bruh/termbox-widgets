@@ -23,7 +23,12 @@ widget_uc_sanitize(uint32_t uc, int *width) {
 		*width = 1;
 		return ' ';
 	default:
-		if (tmp_width <= 0 || tmp_width > WIDGET_CH_MAX) {
+		if (tmp_width < 0) {
+			*width = 1;
+			return uc;
+		}
+
+		if (tmp_width == 0 || tmp_width > WIDGET_CH_MAX) {
 			*width = wcwidth(L'�');
 			return L'�';
 		}
