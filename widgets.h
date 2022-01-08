@@ -105,7 +105,7 @@ struct treeview_node {
 struct treeview {
 	int skipped; /* A hack used to skip lines in recursive rendering. */
 	int start_y;
-	struct treeview_node *root;
+	struct treeview_node root;
 	struct treeview_node *selected;
 };
 
@@ -116,7 +116,7 @@ treeview_node_alloc(
 void
 treeview_node_destroy(struct treeview_node *node);
 int
-treeview_init(struct treeview *treeview, struct treeview_node *root);
+treeview_init(struct treeview *treeview);
 void
 treeview_finish(struct treeview *treeview);
 void

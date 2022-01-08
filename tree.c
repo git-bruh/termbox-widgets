@@ -69,6 +69,46 @@ node_height(struct treeview_node *parent, struct treeview_node *target,
 }
 
 static int
+node_height_up_to_bottom(struct treeview_node *node) {
+	assert(node);
+
+	int height = 1;
+
+	if (!node->is_expanded) {
+		return height;
+	}
+
+	for (size_t i = 0, len = arrlenu(node->nodes); i < len; i++) {
+		height += node_height_up_to_bottom(node->nodes[i]);
+	}
+
+	return height;
+}
+
+static int
+node_height_bottom_to_up(struct treeview_node *node) {
+	assert(node);
+
+	int height = 1;
+
+	if (!node->parent) {
+		return height;
+	}
+
+	assert(node->parent->is_expanded);
+
+	for (size_t i = 0, len = arrlenu(node->parent->nodes); i < len; i++) {
+		if (node->parent->nodes[i] == node) {
+			break;
+		}
+
+		height += node_height_up_to_bottom(node->parent->nodes[i]);
+	}
+
+	return height + node_height_bottom_to_up(node->parent);
+}
+
+static int
 redraw(struct treeview *treeview, const struct treeview_node *node,
   const struct widget_points *points, int x, int y) {
 	if (!node) {
@@ -79,40 +119,41 @@ redraw(struct treeview *treeview, const struct treeview_node *node,
 
 	/* Stolen from tview's semigraphics. */
 	const char symbol[] = "├──";
-	const char symbol_root[] = "───";
 	const char symbol_end[] = "└──";
 	const char symbol_continued[] = "│";
 	const int gap_size = 3; /* Width of the above symbols (first 3). */
 
 	bool is_end = is_last(node);
+	bool is_not_top_level = (node->parent && node->parent->parent);
+	int symbol_printed_width = (is_not_top_level ? gap_size : 0);
 
 	/* Skip the given offset before actually printing stuff. */
-	if (treeview->skipped++ >= treeview->start_y) {
-		/* Print the symbol and use the offset returned from that to print the
-		 * data. */
-		widget_print_str(x, y, points->x2, TB_DEFAULT, TB_DEFAULT,
-		  node->parent ? (is_end ? symbol_end : symbol) : symbol_root);
+	if (node->parent && treeview->skipped++ >= treeview->start_y) {
+		if (is_not_top_level) {
+			widget_print_str(x, y, points->x2, TB_DEFAULT, TB_DEFAULT,
+			  (is_end ? symbol_end : symbol));
+		}
 
-		widget_print_str(x + gap_size, y, points->x2, TB_DEFAULT,
+		widget_print_str(x + symbol_printed_width, y, points->x2, TB_DEFAULT,
 		  node == treeview->selected ? TB_REVERSE : TB_DEFAULT,
 		  node->string_cb(node->data));
 
 		y++; /* Next node will be on another line. */
 	}
 
-	if (!node->is_expanded || (x + gap_size) >= points->x2) {
+	if (!node->is_expanded || (x + symbol_printed_width) >= points->x2) {
 		return y;
 	}
 
 	for (size_t i = 0, len = arrlenu(node->nodes); i < len && y < points->y2;
 		 i++) {
 		int delta
-		  = redraw(treeview, node->nodes[i], points, x + gap_size, y) - y;
+		  = redraw(treeview, node->nodes[i], points, x + symbol_printed_width, y) - y;
 
 		/* We can cheat here and avoid backtracking to show the parent-child
 		 * relation by just filling the gaps as we would if we inspected them
 		 * ourselves. */
-		if (node->parent && !is_end) {
+		if (is_not_top_level && !is_end) {
 			for (int j = 0; j < delta; j++) {
 				widget_print_str(
 				  x, y++, points->x2, TB_DEFAULT, TB_DEFAULT, symbol_continued);
@@ -142,12 +183,8 @@ treeview_node_alloc(
 	return node;
 }
 
-void
-treeview_node_destroy(struct treeview_node *node) {
-	if (!node) {
-		return;
-	}
-
+static void
+node_children_destroy(struct treeview_node *node) {
 	if (node->nodes) {
 		for (size_t i = 0, len = arrlenu(node->nodes); i < len; i++) {
 			treeview_node_destroy(node->nodes[i]);
@@ -155,6 +192,15 @@ treeview_node_destroy(struct treeview_node *node) {
 
 		arrfree(node->nodes);
 	}
+}
+
+void
+treeview_node_destroy(struct treeview_node *node) {
+	if (!node) {
+		return;
+	}
+
+	node_children_destroy(node);
 
 	if (node->free_cb) {
 		node->free_cb(node);
@@ -164,13 +210,15 @@ treeview_node_destroy(struct treeview_node *node) {
 }
 
 int
-treeview_init(struct treeview *treeview, struct treeview_node *root) {
-	if (!treeview || !root) {
+treeview_init(struct treeview *treeview) {
+	if (!treeview) {
 		return -1;
 	}
 
 	*treeview = (struct treeview) {
-	  .root = root,
+	  .root = {
+	  	.is_expanded = true,
+	  },
 	};
 
 	return 0;
@@ -179,24 +227,27 @@ treeview_init(struct treeview *treeview, struct treeview_node *root) {
 void
 treeview_finish(struct treeview *treeview) {
 	if (treeview) {
-		treeview_node_destroy(treeview->root);
+		node_children_destroy(&treeview->root);
 		memset(treeview, 0, sizeof(*treeview));
 	}
 }
 
 void
 treeview_redraw(struct treeview *treeview, struct widget_points *points) {
-	if (!treeview || !points) {
+	if (!treeview || !treeview->selected || !points) {
 		return;
 	}
 
-	int tmp = 0;
-	int selected_height
-	  = node_height(treeview->root, treeview->selected, 0, &tmp);
+	int selected_height = node_height_bottom_to_up(treeview->selected) - 1;
 
-	if (selected_height < 1) {
-		selected_height = 1;
+	{
+		int tmp = 0;
+		int old_selected_height
+	  		= node_height(&treeview->root, treeview->selected, 0, &tmp) - 1;
+		assert(selected_height == old_selected_height);
 	}
+
+	assert(selected_height > 0);
 
 	int diff_forward
 	  = selected_height - (treeview->start_y + (points->y2 - points->y1));
@@ -211,7 +262,7 @@ treeview_redraw(struct treeview *treeview, struct widget_points *points) {
 	assert(treeview->start_y >= 0);
 	assert(treeview->start_y < selected_height);
 
-	redraw(treeview, treeview->root, points, points->x1, points->y1);
+	redraw(treeview, &treeview->root, points, points->x1, points->y1);
 
 	/* Reset the number of skipped lines. */
 	treeview->skipped = 0;
@@ -219,7 +270,7 @@ treeview_redraw(struct treeview *treeview, struct widget_points *points) {
 
 enum widget_error
 treeview_event(struct treeview *treeview, enum treeview_event event, ...) {
-	if (!treeview->root) {
+	if (!treeview) {
 		return WIDGET_NOOP;
 	}
 
@@ -242,7 +293,7 @@ treeview_event(struct treeview *treeview, enum treeview_event event, ...) {
 			treeview->selected = leaf(treeview->selected); /* Bottom node. */
 		} else if (treeview->selected->parent->parent) {
 			treeview->selected = treeview->selected->parent;
-		} else if (treeview->selected == treeview->root->nodes[0]) {
+		} else if (treeview->selected == treeview->root.nodes[0]) {
 			treeview->start_y = 0; /* Scroll up to the title if we're already at
 								  the top-most node. */
 		} else {
@@ -261,7 +312,7 @@ treeview_event(struct treeview *treeview, enum treeview_event event, ...) {
 		} else {
 			/* Ensure that we don't create a loop between the end-most node of
 			 * the tree and it's parent at the root. */
-			if (treeview->selected != (leaf(treeview->root))) {
+			if (treeview->selected != (leaf(&treeview->root))) {
 				treeview->selected = parent_next(treeview->selected);
 			}
 		}
@@ -302,7 +353,7 @@ treeview_event(struct treeview *treeview, enum treeview_event event, ...) {
 				break;
 			}
 
-			nnode->parent = !treeview->selected ? treeview->root
+			nnode->parent = !treeview->selected ? &treeview->root
 												: treeview->selected->parent;
 			arrput(nnode->parent->nodes, nnode);
 
