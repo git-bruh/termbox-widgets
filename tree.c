@@ -134,10 +134,10 @@ redraw(struct treeview *treeview, const struct treeview_node *node,
 			  (is_end ? symbol_end : symbol));
 		}
 
-		widget_print_str(x + symbol_printed_width, y, points->x2, TB_DEFAULT,
-		  node == treeview->selected ? TB_REVERSE : TB_DEFAULT,
-		  node->string_cb(node->data));
+		struct widget_points user_points = {0};
+		widget_points_set(&user_points, x + symbol_printed_width, points->x2, y, points->y2);
 
+		node->draw_cb(node->data, &user_points, (node == treeview->selected));
 		y++; /* Next node will be on another line. */
 	}
 
@@ -168,14 +168,14 @@ redraw(struct treeview *treeview, const struct treeview_node *node,
 
 struct treeview_node *
 treeview_node_alloc(
-  void *data, treeview_string_cb string_cb, treeview_free_cb free_cb) {
-	struct treeview_node *node = string_cb ? malloc(sizeof(*node)) : NULL;
+  void *data, treeview_draw_cb draw_cb, treeview_free_cb free_cb) {
+	struct treeview_node *node = draw_cb ? malloc(sizeof(*node)) : NULL;
 
 	if (node) {
 		*node = (struct treeview_node) {
 		  .is_expanded = true,
 		  .data = data,
-		  .string_cb = string_cb,
+		  .draw_cb = draw_cb,
 		  .free_cb = free_cb,
 		};
 	}

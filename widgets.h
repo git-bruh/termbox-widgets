@@ -74,8 +74,8 @@ input_buf(struct input *input);
 
 /* Treeview. */
 
-/* Called to request string representation of the data. */
-typedef const char *(*treeview_string_cb)(void *data);
+/* Called to draw the data. */
+typedef void (*treeview_draw_cb)(void *data, struct widget_points *points, bool is_selected);
 /* Called when destroying the node. */
 typedef void (*treeview_free_cb)(void *data);
 
@@ -98,7 +98,7 @@ struct treeview_node {
 	struct treeview_node *parent;
 	struct treeview_node **nodes;
 	void *data; /* Any user data. */
-	treeview_string_cb string_cb;
+	treeview_draw_cb draw_cb;
 	treeview_free_cb free_cb;
 };
 
@@ -112,7 +112,7 @@ struct treeview {
 /* Pass NULL as the free_cb if the data is stack allocated. */
 struct treeview_node *
 treeview_node_alloc(
-  void *data, treeview_string_cb string_cb, treeview_free_cb free_cb);
+  void *data, treeview_draw_cb draw_cb, treeview_free_cb free_cb);
 void
 treeview_node_destroy(struct treeview_node *node);
 int
