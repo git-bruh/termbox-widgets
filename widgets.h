@@ -116,6 +116,8 @@ treeview_node_alloc(
 void
 treeview_node_destroy(struct treeview_node *node);
 int
+treeview_node_add_child(struct treeview_node *parent, struct treeview_node *child);
+int
 treeview_init(struct treeview *treeview);
 void
 treeview_finish(struct treeview *treeview);

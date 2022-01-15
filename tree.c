@@ -183,6 +183,16 @@ treeview_node_alloc(
 	return node;
 }
 
+int
+treeview_node_add_child(struct treeview_node *parent, struct treeview_node *child) {
+	if (!parent || !child || parent == child) {
+		return -1;
+	}
+
+	child->parent = parent;
+	arrput(parent->nodes, child);
+}
+
 static void
 node_children_destroy(struct treeview_node *node) {
 	if (node->nodes) {
