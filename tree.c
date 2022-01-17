@@ -36,38 +36,6 @@ parent_next(struct treeview_node *node) {
 	return node;
 }
 
-/* Get the height of the tree upto the givcn node.
- * This is very hacky but it's the only way to do this recursively. */
-static int
-node_height(struct treeview_node *parent, struct treeview_node *target,
-  int height, int *realheight) {
-	/* Break out of recursion if we found the target. */
-	if (*realheight > 0) {
-		return *realheight;
-	}
-
-	if (!parent) {
-		return height;
-	}
-
-	height++;
-
-	if (!parent->is_expanded) {
-		return height;
-	}
-
-	for (size_t i = 0, len = arrlenu(parent->nodes); i < len; i++) {
-		if (parent->nodes[i] == target) {
-			*realheight = height + 1;
-			return *realheight;
-		}
-
-		height = node_height(parent->nodes[i], target, height, realheight);
-	}
-
-	return *realheight > 0 ? *realheight : height;
-}
-
 static int
 node_height_up_to_bottom(struct treeview_node *node) {
 	assert(node);
@@ -191,6 +159,8 @@ treeview_node_add_child(struct treeview_node *parent, struct treeview_node *chil
 
 	child->parent = parent;
 	arrput(parent->nodes, child);
+
+	return 0;
 }
 
 static void
@@ -249,14 +219,6 @@ treeview_redraw(struct treeview *treeview, struct widget_points *points) {
 	}
 
 	int selected_height = node_height_bottom_to_up(treeview->selected) - 1;
-
-	{
-		int tmp = 0;
-		int old_selected_height
-	  		= node_height(&treeview->root, treeview->selected, 0, &tmp) - 1;
-		assert(selected_height == old_selected_height);
-	}
-
 	assert(selected_height > 0);
 
 	int diff_forward
