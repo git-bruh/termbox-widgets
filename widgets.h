@@ -113,6 +113,9 @@ struct treeview {
 struct treeview_node *
 treeview_node_alloc(
   void *data, treeview_draw_cb draw_cb, treeview_free_cb free_cb);
+int
+treeview_node_init(struct treeview_node *node, void *data, treeview_draw_cb draw_cb,
+treeview_free_cb free_cb);
 void
 treeview_node_destroy(struct treeview_node *node);
 int

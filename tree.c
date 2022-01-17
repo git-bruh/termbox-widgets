@@ -134,18 +134,29 @@ redraw(struct treeview *treeview, const struct treeview_node *node,
 	return y;
 }
 
+int
+treeview_node_init(struct treeview_node *node, void *data, treeview_draw_cb draw_cb, treeview_free_cb free_cb) {
+	if (!node || !draw_cb) {
+		return -1;
+	}
+
+	*node = (struct treeview_node) {
+		.is_expanded = true,
+		.data = data,
+		.draw_cb = draw_cb,
+		.free_cb = free_cb
+	};
+
+	return 0;
+}
+
 struct treeview_node *
 treeview_node_alloc(
   void *data, treeview_draw_cb draw_cb, treeview_free_cb free_cb) {
 	struct treeview_node *node = draw_cb ? malloc(sizeof(*node)) : NULL;
 
 	if (node) {
-		*node = (struct treeview_node) {
-		  .is_expanded = true,
-		  .data = data,
-		  .draw_cb = draw_cb,
-		  .free_cb = free_cb,
-		};
+		treeview_node_init(node, data, draw_cb, free_cb);
 	}
 
 	return node;
