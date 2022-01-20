@@ -132,10 +132,14 @@ widget_print_str(
 	while (*str) {
 		str += tb_utf8_char_to_unicode(&uc, str);
 		uc = widget_uc_sanitize(uc, &width);
-		tb_set_cell(x, y, uc, fg, bg);
-		x += width;
 
-		if ((widget_should_scroll(x, WIDGET_CH_MAX, max_x))) {
+		if (width == 0) {
+			break;
+		}
+
+		tb_set_cell(x, y, uc, fg, bg);
+
+		if ((x += width) > max_x) {
 			break;
 		}
 	}
