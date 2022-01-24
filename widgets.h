@@ -329,6 +329,8 @@ border_redraw(struct widget_points *points, uintattr_t fg, uintattr_t bg) {
 		return;
 	}
 
+	int height = points->y2 - points->y1;
+
 	for (int x = points->x1 + 1; x < (points->x2 - 1); x++) {
 		widget_print_str(
 		  x, points->y1, points->x2, fg, bg, borders[BORDER_NORMAL]);
@@ -339,21 +341,25 @@ border_redraw(struct widget_points *points, uintattr_t fg, uintattr_t bg) {
 	widget_print_str(points->x2 - 1, points->y1, points->x2, fg, bg,
 	  borders[BORDER_CORNER_RIGHT]);
 
-	for (int y = points->y1 + 1; y < (points->y2 - 1); y++) {
+	/* Not points->y2 - 1 so that we write borders even if height < 2 */
+	for (int y = points->y1 + 1; y < points->y2; y++) {
 		widget_print_str(
 		  points->x1, y, points->x2, fg, bg, borders[BORDER_VERTICAL]);
 		widget_print_str(
 		  points->x2 - 1, y, points->x2, fg, bg, borders[BORDER_VERTICAL]);
 	}
 
-	widget_print_str(points->x1, points->y2 - 1, points->x2, fg, bg,
-	  borders[BORDER_CORNER_LEFT_BOTTOM]);
-	widget_print_str(points->x2 - 1, points->y2 - 1, points->x2, fg, bg,
-	  borders[BORDER_CORNER_RIGHT_BOTTOM]);
+	/* Don't overwrite the left/right or top connection. */
+	if (height > 2) {
+		widget_print_str(points->x1, points->y2 - 1, points->x2, fg, bg,
+		  borders[BORDER_CORNER_LEFT_BOTTOM]);
+		widget_print_str(points->x2 - 1, points->y2 - 1, points->x2, fg, bg,
+		  borders[BORDER_CORNER_RIGHT_BOTTOM]);
 
-	for (int x = points->x1 + 1; x < (points->x2 - 1); x++) {
-		widget_print_str(
-		  x, points->y2 - 1, points->x2, fg, bg, borders[BORDER_NORMAL]);
+		for (int x = points->x1 + 1; x < (points->x2 - 1); x++) {
+			widget_print_str(
+			  x, points->y2 - 1, points->x2, fg, bg, borders[BORDER_NORMAL]);
+		}
 	}
 }
 
