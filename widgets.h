@@ -37,6 +37,10 @@ widget_print_str(
 int
 widget_pad_center(int part, int total);
 
+/* Border */
+void
+border_redraw(struct widget_points *points);
+
 /* Input. */
 enum input_event {
 	INPUT_CLEAR = 0,
@@ -298,6 +302,59 @@ widget_pad_center(int part, int total) {
 	}
 
 	return padding;
+}
+
+enum {
+	BORDER_NORMAL = 0,
+	BORDER_CORNER_LEFT,
+	BORDER_CORNER_RIGHT,
+	BORDER_CORNER_LEFT_BOTTOM,
+	BORDER_CORNER_RIGHT_BOTTOM,
+	BORDER_VERTICAL,
+	BORDER_MAX
+};
+
+static const char *const borders[BORDER_MAX] = {
+  [BORDER_NORMAL] = "─",
+  [BORDER_CORNER_LEFT] = "┌",
+  [BORDER_CORNER_RIGHT] = "┐",
+  [BORDER_CORNER_LEFT_BOTTOM] = "└",
+  [BORDER_CORNER_RIGHT_BOTTOM] = "┘",
+  [BORDER_VERTICAL] = "│",
+};
+
+void
+border_redraw(struct widget_points *points) {
+	if (!points) {
+		return;
+	}
+
+	for (int x = points->x1 + 1; x < (points->x2 - 1); x++) {
+		widget_print_str(x, points->y1, points->x2, TB_DEFAULT, TB_DEFAULT,
+		  borders[BORDER_NORMAL]);
+	}
+
+	widget_print_str(points->x1, points->y1, points->x2, TB_DEFAULT, TB_DEFAULT,
+	  borders[BORDER_CORNER_LEFT]);
+	widget_print_str(points->x2 - 1, points->y1, points->x2, TB_DEFAULT,
+	  TB_DEFAULT, borders[BORDER_CORNER_RIGHT]);
+
+	for (int y = points->y1 + 1; y < (points->y2 - 1); y++) {
+		widget_print_str(points->x1, y, points->x2, TB_DEFAULT, TB_DEFAULT,
+		  borders[BORDER_VERTICAL]);
+		widget_print_str(points->x2 - 1, y, points->x2, TB_DEFAULT, TB_DEFAULT,
+		  borders[BORDER_VERTICAL]);
+	}
+
+	widget_print_str(points->x1, points->y2 - 1, points->x2, TB_DEFAULT,
+	  TB_DEFAULT, borders[BORDER_CORNER_LEFT_BOTTOM]);
+	widget_print_str(points->x2 - 1, points->y2 - 1, points->x2, TB_DEFAULT,
+	  TB_DEFAULT, borders[BORDER_CORNER_RIGHT_BOTTOM]);
+
+	for (int x = points->x1 + 1; x < (points->x2 - 1); x++) {
+		widget_print_str(x, points->y2 - 1, points->x2, TB_DEFAULT, TB_DEFAULT,
+		  borders[BORDER_NORMAL]);
+	}
 }
 
 enum {
