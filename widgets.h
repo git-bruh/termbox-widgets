@@ -482,7 +482,9 @@ input_finish(struct input *input) {
 
 void
 input_redraw(struct input *input, struct widget_points *points, int *rows) {
-	if (!input || !points || !rows) {
+	/* Points might be invalid from the caller. */
+	if (!input || !points || !rows
+		|| !(widget_points_in_bounds(points, points->x1, points->y1))) {
 		return;
 	}
 
