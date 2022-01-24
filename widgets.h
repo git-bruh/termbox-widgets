@@ -1,5 +1,14 @@
 #ifndef WIDGETS_H
 #define WIDGETS_H
+#ifdef WIDGETS_TESTS
+#undef NDEBUG
+#define TB_IMPL
+#define STB_DS_IMPLEMENTATION
+#ifndef WIDGETS_IMPL
+#define WIDGETS_IMPL
+#endif /* !WIDGETS_IMPL */
+#endif /* !WIDGETS_TESTS */
+
 #include "termbox.h"
 
 #include <stdbool.h>
@@ -134,6 +143,7 @@ void
 treeview_redraw(struct treeview *treeview, struct widget_points *points);
 enum widget_error
 treeview_event(struct treeview *treeview, enum treeview_event event, ...);
+
 #endif /* !WIDGETS_H */
 
 #ifdef WIDGETS_IMPL
@@ -193,9 +203,15 @@ widget_str_width(const char *str) {
 			int ch_width = 0;
 			uint32_t uc = 0;
 
-			i += (size_t) tb_utf8_char_to_unicode(&uc, &str[i]);
+			int len = tb_utf8_char_to_unicode(&uc, &str[i]);
+
+			if (len == TB_ERR) {
+				break;
+			}
+
 			widget_uc_sanitize(uc, &ch_width);
 
+			i += (size_t) len;
 			width += ch_width;
 		}
 	}
@@ -233,7 +249,7 @@ widget_should_forcebreak(int width) {
 
 bool
 widget_should_scroll(int x, int width, int max_width) {
-	return (x >= (max_width - width) || (widget_should_forcebreak(width)));
+	return (x > (max_width - width) || (widget_should_forcebreak(width)));
 }
 
 /* Returns the number of times y was advanced. */
@@ -283,11 +299,13 @@ widget_print_str(
 			break;
 		}
 
-		tb_set_cell(x, y, uc, fg, bg);
-
-		if ((x += width) > max_x) {
+		if ((x + width) > max_x) {
 			break;
 		}
+
+		tb_set_cell(x, y, uc, fg, bg);
+
+		x += width;
 	}
 
 	return x - original;
@@ -369,7 +387,7 @@ enum {
 
 static enum widget_error
 buf_add(struct input *input, uint32_t ch) {
-	if (((arrlenu(input->buf)) + 1) >= BUF_MAX) {
+	if (((arrlenu(input->buf)) + 1) > BUF_MAX) {
 		return WIDGET_NOOP;
 	}
 
@@ -483,7 +501,13 @@ input_finish(struct input *input) {
 void
 input_redraw(struct input *input, struct widget_points *points, int *rows) {
 	/* Points might be invalid from the caller. */
-	if (!input || !points || !rows
+	if (!rows) {
+		return;
+	}
+
+	*rows = 0;
+
+	if (!input || !points
 		|| !(widget_points_in_bounds(points, points->x1, points->y1))) {
 		return;
 	}
@@ -1098,4 +1122,177 @@ treeview_event(struct treeview *treeview, enum treeview_event event, ...) {
 
 	return WIDGET_NOOP;
 }
+
+#ifdef WIDGETS_TESTS
+#include <assert.h>
+#include <locale.h>
+
+int
+main(void) {
+	assert(tb_init() == TB_OK);
+	setlocale(LC_ALL, "");
+
+	{
+		struct widget_points points = {0};
+
+		widget_points_set(&points, 0, 1, 0, 1);
+		assert(widget_points_in_bounds(&points, points.x1, points.y1));
+		widget_points_set(&points, 0, 2, 5, 5);
+		assert(!widget_points_in_bounds(&points, points.x1, points.y1));
+		widget_points_set(&points, 5, 5, 5, 5);
+		assert(!widget_points_in_bounds(&points, points.x1, points.y1));
+		widget_points_set(&points, -1, tb_width() + 1, -1, tb_height() + 1);
+		assert(points.x1 == 0);
+		assert(points.x2 == tb_width());
+		assert(points.y1 == 0);
+		assert(points.y2 == tb_height());
+
+		assert(widget_str_width("Test") == 4);
+		assert(widget_str_width("😄") == 2);
+		assert(widget_str_width("Test 😄") == 7);
+		assert(widget_str_width("├──") == 3);
+		assert(widget_str_width("│") == 1);
+		assert(widget_str_width("└──") == 3);
+		assert(widget_str_width("\n") == 0);
+#define print_str(str, max_x)                                                  \
+	widget_print_str(0, 0, max_x, TB_DEFAULT, TB_DEFAULT, str)
+		const int large_testx = 100;
+
+		assert(print_str("Test", large_testx) == 4);
+		assert(print_str("Test", 4) == 4);
+		assert(print_str("Test", 3) == 3);
+		assert(print_str("Test", 0) == 0);
+		assert(print_str("Te\nst", large_testx) == 2);
+		assert(print_str("😄", large_testx) == 2);
+		assert(print_str("😄", 2) == 2);
+		assert(print_str("😄", 1) == 0);
+		assert(print_str("├──", large_testx) == 3);
+		assert(print_str("├──", 3) == 3);
+		assert(print_str("├──", 2) == 2);
+		assert(print_str("│", 1) == 1);
+		assert(print_str("│", 0) == 0);
+		assert(print_str("Test 😄", large_testx) == 7);
+		assert(print_str("Test 😄", 6) == 5);
+#undef print_str
+
+		{
+			int width = 0;
+
+			assert(widget_uc_sanitize('\n', &width) == '\n');
+			assert(width == 0);
+			assert(widget_should_forcebreak(width));
+			assert(widget_should_scroll(0, 0, 0));
+
+			assert(widget_uc_sanitize('\t', &width) == ' ');
+			assert(width == 1);
+
+			assert(widget_uc_sanitize(L'😄', &width) == L'😄');
+			assert(width == 2);
+		}
+
+		assert(!widget_should_scroll(tb_width() - 1, 1, tb_width()));
+		assert(widget_should_scroll(tb_width(), 1, tb_width()));
+
+		assert(widget_pad_center(40, 80) == 20);
+		assert(widget_pad_center(26, 85) == 30);
+		assert(widget_pad_center(50, 10) == 0);
+	}
+
+	struct widget_points points = {0};
+	widget_points_set(&points, 0, 80, 0, 24);
+
+	{
+		struct input input;
+		int rows = 0;
+
+		assert(input_init(&input, TB_DEFAULT, false) == 0);
+		input_redraw(&input, &points, &rows);
+		assert(rows == 1);
+
+		input.scroll_horizontal = true;
+		input_redraw(&input, &points, &rows);
+		assert(rows == 1);
+
+		input.scroll_horizontal = false;
+
+		for (size_t i = 0; i < BUF_MAX; i++) {
+			assert(input_handle_event(&input, INPUT_ADD, ' ') == WIDGET_REDRAW);
+		}
+
+		assert(input_handle_event(&input, INPUT_ADD, ' ') == WIDGET_NOOP);
+		input_redraw(&input, &points, &rows);
+		assert(rows == 24);
+
+		input.scroll_horizontal = true;
+		input_redraw(&input, &points, &rows);
+		assert(rows == 1);
+		input.scroll_horizontal = false;
+
+		char *buf = input_buf(&input);
+		assert(strlen(buf) == 2000);
+		free(buf);
+		buf = NULL;
+
+		input_handle_event(&input, INPUT_CLEAR);
+		assert(input_buf(&input) == NULL);
+
+		input_finish(&input);
+		assert(input_init(&input, TB_DEFAULT, false) == 0);
+
+		char *buf_test = "Test";
+
+		/* Empty. */
+		for (enum input_event event = INPUT_DELETE; event < INPUT_ADD;
+			 event++) {
+			assert(input_handle_event(&input, event) == WIDGET_NOOP);
+		}
+
+		for (size_t i = 0, len = strlen(buf_test); i < len; i++) {
+			assert(input_handle_event(&input, INPUT_ADD, buf_test[i])
+				   == WIDGET_REDRAW);
+		}
+
+		assert(input.cur_buf == 4);
+
+		assert(arrlenu(input.buf) == strlen(buf_test));
+		char *buf_input = input_buf(&input);
+		assert(strcmp(buf_test, buf_input) == 0);
+		free(buf_input);
+
+		assert(input_handle_event(&input, INPUT_LEFT) == WIDGET_REDRAW);
+		assert(input.cur_buf == 3);
+		assert(input_handle_event(&input, INPUT_LEFT_WORD) == WIDGET_REDRAW);
+		assert(input.cur_buf == 0);
+
+		assert(input_handle_event(&input, INPUT_RIGHT) == WIDGET_REDRAW);
+		assert(input.cur_buf == 1);
+		assert(input_handle_event(&input, INPUT_RIGHT_WORD) == WIDGET_REDRAW);
+		assert(input.cur_buf == 4);
+
+		assert(input_handle_event(&input, INPUT_LEFT) == WIDGET_REDRAW);
+		assert(input.cur_buf == 3);
+
+		assert(input_handle_event(&input, INPUT_ADD, 'i') == WIDGET_REDRAW);
+		assert(input.cur_buf == 4);
+
+		assert(input_handle_event(&input, INPUT_LEFT) == WIDGET_REDRAW);
+		assert(input.cur_buf == 3);
+
+		assert(input_handle_event(&input, INPUT_RIGHT_WORD) == WIDGET_REDRAW);
+		assert(input.cur_buf == 5);
+
+		assert(input_handle_event(&input, INPUT_DELETE) == WIDGET_REDRAW);
+		buf_input = input_buf(&input);
+		assert(strcmp("Tesi", buf_input) == 0);
+		free(buf_input);
+
+		assert(input_handle_event(&input, INPUT_DELETE_WORD) == WIDGET_REDRAW);
+		assert(input_buf(&input) == NULL);
+
+		input_finish(&input);
+	}
+
+	assert(tb_shutdown() == TB_OK);
+}
+#endif
 #endif /* WIDGETS_IMPL */

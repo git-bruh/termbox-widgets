@@ -15,6 +15,8 @@ In a single `.c` file, do the following to build the implementation:
 
 `stb_ds.h` needs to be built in a similar manner in a _SEPARATE_ `.c` file with `#define STB_DS_IMPLEMENTATION`.
 
+For running tests, run `cc -x c widgets.h -lm -DWIDGETS_TESTS -o test && ./test`.
+
 The API is defined in `widgets.h`. Each widget takes a `widget_points` structure containing the coordinates of the rectangle in which it can draw. This makes the library entirely agnostic to user-defined widgets as you only need to ensure that widgets don't overlap and are not forced into defining them in a specific manner like full-fledged UI toolkits do. However, some utility functions like `widget_print_str` and `widget_pad_center` are provided to optionally assist in writing user-defined widgets.
 
 The widgets defined here depend on the user providing them events instead of using callbacks, which makes the widgets agnostic to key bindings etc. aswell.
@@ -27,6 +29,7 @@ Here is an example of a basic input field:
 #define STB_DS_IMPLEMENTATION
 #define _GNU_SOURCE
 #include "widgets.h"
+#include <locale.h>
 
 int
 main(void) {
@@ -34,6 +37,7 @@ main(void) {
 		return EXIT_FAILURE;
 	}
 	tb_set_input_mode(TB_INPUT_ALT);
+	setlocale(LC_ALL, ""); /* Fix unicode handling */
 
 	struct tb_event event;
 	struct input input;
