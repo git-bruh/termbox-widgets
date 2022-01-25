@@ -35,11 +35,16 @@ void
 widget_points_set(struct widget_points *points, int x1, int x2, int y1, int y2);
 bool
 widget_should_forcebreak(int width);
+/* Checks whether adding a character of width 'width' would overflow the
+ * screen. Returns false even if x + width == max_width as that would be the
+ * index where new characters would be printed, not the current one. */
 bool
 widget_should_scroll(int x, int width, int max_width);
-/* Returns the number of times y was advanced. */
-int
-widget_adjust_xy(int width, const struct widget_points *points, int *x, int *y);
+/* Resets x to points->x1 and increments y if adding a character of width
+ * 'width' would overflow the screen and return true, else false. */
+bool
+widget_advance_xy_if_scroll(
+  int *x, int *y, struct widget_points *points, int width);
 int
 widget_print_str(
   int x, int y, int max_x, uintattr_t fg, uintattr_t bg, const char *str);
@@ -252,32 +257,17 @@ widget_should_scroll(int x, int width, int max_width) {
 	return (x > (max_width - width) || (widget_should_forcebreak(width)));
 }
 
-/* Returns the number of times y was advanced. */
-int
-widget_adjust_xy(
-  int width, const struct widget_points *points, int *x, int *y) {
-	int original_y = *y;
-
-	if ((widget_should_scroll(*x, width, points->x2))) {
+bool
+widget_advance_xy_if_scroll(
+  int *x, int *y, struct widget_points *points, int width) {
+	if (x && y && points && (widget_should_scroll(*x, width, points->x2))) {
 		*x = points->x1;
 		(*y)++;
+
+		return true;
 	}
 
-	/* Newline, already scrolled. */
-	if ((widget_should_forcebreak(width))) {
-		return *y - original_y;
-	}
-
-	*x += width;
-
-	/* We must accomodate for another character to move the cursor to the next
-	 * line, which prevents us from adding an unreachable character. */
-	if ((widget_should_scroll(*x, WIDGET_CH_MAX, points->x2))) {
-		*x = points->x1;
-		(*y)++;
-	}
-
-	return *y - original_y;
+	return false;
 }
 
 int
@@ -292,14 +282,16 @@ widget_print_str(
 	int original = x;
 
 	while (*str) {
-		str += tb_utf8_char_to_unicode(&uc, str);
-		uc = widget_uc_sanitize(uc, &width);
+		int len = tb_utf8_char_to_unicode(&uc, str);
 
-		if (width == 0) {
+		if (len == TB_ERR) {
 			break;
 		}
 
-		if ((x + width) > max_x) {
+		str += len;
+		uc = widget_uc_sanitize(uc, &width);
+
+		if ((widget_should_scroll(x, width, max_x))) {
 			break;
 		}
 
@@ -500,13 +492,13 @@ input_finish(struct input *input) {
 
 void
 input_redraw(struct input *input, struct widget_points *points, int *rows) {
-	/* Points might be invalid from the caller. */
 	if (!rows) {
 		return;
 	}
 
 	*rows = 0;
 
+	/* Points might be invalid from the caller. */
 	if (!input || !points
 		|| !(widget_points_in_bounds(points, points->x1, points->y1))) {
 		return;
@@ -576,13 +568,21 @@ input_redraw(struct input *input, struct widget_points *points, int *rows) {
 
 	{
 		int x = points->x1;
-		int y = 0;
 		int width = 0;
 
 		for (size_t written = 0; written < buf_len; written++) {
 			widget_uc_sanitize(input->buf[written], &width);
 
-			lines += widget_adjust_xy(width, points, &x, &y);
+			bool has_cursor = (written + 1) == input->cur_buf;
+
+			widget_advance_xy_if_scroll(&x, &lines, points, width);
+
+			x += width;
+
+			/* Check if adding another character would overflow the screen. This
+			 * prevents us from having the cursor stuck in the 1px gap between
+			 * points->x2 and points->x2 - 1 if the character was an emoji. */
+			widget_advance_xy_if_scroll(&x, &lines, points, WIDGET_CH_MAX);
 
 			if ((written + 1) == input->cur_buf) {
 				cur_x = x;
@@ -625,30 +625,36 @@ input_redraw(struct input *input, struct widget_points *points, int *rows) {
 
 		widget_uc_sanitize(input->buf[written], &width);
 
-		line += widget_adjust_xy(width, points, &x, &y);
+		line += widget_advance_xy_if_scroll(&x, &y, points, width);
+		x += width;
+		line += widget_advance_xy_if_scroll(&x, &y, points, WIDGET_CH_MAX);
 	}
 
-	int x = points->x1;
+	int cur_y = lines_fit_in_height
+				? (y + cur_line - 1)
+				: (points->y1 + (cur_line - (input->start_y + 1)));
 
-	tb_set_cursor(cur_x, lines_fit_in_height
-						   ? (y + cur_line - 1)
-						   : (points->y1 + (cur_line - (input->start_y + 1))));
+	assert((widget_points_in_bounds(points, cur_x, cur_y)));
+	tb_set_cursor(cur_x, cur_y);
 
-	while (written < buf_len) {
+	for (int x = points->x1; written < buf_len; written++) {
 		if (line >= lines || (y - input->start_y) >= points->y2) {
 			break;
 		}
 
 		assert((widget_points_in_bounds(points, x, y - input->start_y)));
 
-		uint32_t uc = widget_uc_sanitize(input->buf[written++], &width);
+		uint32_t uc = widget_uc_sanitize(input->buf[written], &width);
+
+		line += widget_advance_xy_if_scroll(&x, &y, points, width);
 
 		/* Don't print newlines directly as they mess up the screen. */
 		if (!widget_should_forcebreak(width)) {
 			tb_set_cell(x, y - input->start_y, uc, TB_DEFAULT, input->bg);
 		}
 
-		line += widget_adjust_xy(width, points, &x, &y);
+		x += width;
+		line += widget_advance_xy_if_scroll(&x, &y, points, WIDGET_CH_MAX);
 	}
 
 	*rows = (lines_fit_in_height ? (line + 1) : max_height);
@@ -1200,6 +1206,25 @@ main(void) {
 
 	struct widget_points points = {0};
 	widget_points_set(&points, 0, 80, 0, 24);
+
+	{
+		int x = 78;
+		int y = 0;
+
+		assert(!widget_advance_xy_if_scroll(&x, &y, &points, 2));
+		assert(y == 0);
+		assert(x == 78);
+
+		x = 80;
+
+		points.x1 = 2;
+
+		assert(widget_advance_xy_if_scroll(&x, &y, &points, 1));
+		assert(y == 1);
+		assert(x == 2);
+
+		points.x1 = 0;
+	}
 
 	{
 		struct input input;
