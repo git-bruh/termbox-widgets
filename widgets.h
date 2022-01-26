@@ -573,8 +573,6 @@ input_redraw(struct input *input, struct widget_points *points, int *rows) {
 		for (size_t written = 0; written < buf_len; written++) {
 			widget_uc_sanitize(input->buf[written], &width);
 
-			bool has_cursor = (written + 1) == input->cur_buf;
-
 			widget_advance_xy_if_scroll(&x, &lines, points, width);
 
 			x += width;
