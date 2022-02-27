@@ -95,8 +95,6 @@ input_buf(struct input *input);
 /* Called to draw the data. */
 typedef void (*treeview_draw_cb)(
   void *data, struct widget_points *points, bool is_selected);
-/* Called when destroying the node. */
-typedef void (*treeview_free_cb)(void *data);
 
 enum treeview_event {
 	TREEVIEW_EXPAND = 0,
@@ -118,7 +116,6 @@ struct treeview_node {
 	struct treeview_node **nodes;
 	void *data; /* Any user data. */
 	treeview_draw_cb draw_cb;
-	treeview_free_cb free_cb;
 };
 
 struct treeview {
@@ -128,15 +125,15 @@ struct treeview {
 	struct treeview_node *selected;
 };
 
-/* Pass NULL as the free_cb if the data is stack allocated. */
 struct treeview_node *
-treeview_node_alloc(
-  void *data, treeview_draw_cb draw_cb, treeview_free_cb free_cb);
+treeview_node_alloc(void *data, treeview_draw_cb draw_cb);
 int
-treeview_node_init(struct treeview_node *node, void *data,
-  treeview_draw_cb draw_cb, treeview_free_cb free_cb);
+treeview_node_init(
+  struct treeview_node *node, void *data, treeview_draw_cb draw_cb);
 void
 treeview_node_destroy(struct treeview_node *node);
+void
+treeview_node_finish(struct treeview_node *node);
 int
 treeview_node_add_child(
   struct treeview_node *parent, struct treeview_node *child);
@@ -875,27 +872,24 @@ redraw(struct treeview *treeview, const struct treeview_node *node,
 }
 
 int
-treeview_node_init(struct treeview_node *node, void *data,
-  treeview_draw_cb draw_cb, treeview_free_cb free_cb) {
+treeview_node_init(
+  struct treeview_node *node, void *data, treeview_draw_cb draw_cb) {
 	if (!node || !draw_cb) {
 		return -1;
 	}
 
-	*node = (struct treeview_node) {.is_expanded = true,
-	  .data = data,
-	  .draw_cb = draw_cb,
-	  .free_cb = free_cb};
+	*node = (struct treeview_node) {
+	  .is_expanded = true, .data = data, .draw_cb = draw_cb};
 
 	return 0;
 }
 
 struct treeview_node *
-treeview_node_alloc(
-  void *data, treeview_draw_cb draw_cb, treeview_free_cb free_cb) {
+treeview_node_alloc(void *data, treeview_draw_cb draw_cb) {
 	struct treeview_node *node = draw_cb ? malloc(sizeof(*node)) : NULL;
 
 	if (node) {
-		treeview_node_init(node, data, draw_cb, free_cb);
+		treeview_node_init(node, data, draw_cb);
 	}
 
 	return node;
@@ -932,12 +926,21 @@ treeview_node_destroy(struct treeview_node *node) {
 	}
 
 	node_children_destroy(node);
+	free(node);
+}
 
-	if (node->free_cb) {
-		node->free_cb(node);
+void
+treeview_node_finish(struct treeview_node *node) {
+	if (!node) {
+		return;
 	}
 
-	free(node);
+	for (size_t i = 0, len = arrlenu(node->nodes); i < len; i++) {
+		treeview_node_finish(node->nodes[i]);
+	}
+
+	arrfree(node->nodes);
+	memset(node, 0, sizeof(*node));
 }
 
 int
