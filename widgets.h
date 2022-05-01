@@ -100,11 +100,14 @@ enum treeview_event {
 	TREEVIEW_EXPAND = 0,
 	TREEVIEW_UP,
 	TREEVIEW_DOWN,
-	/* Must pass a treeview_node struct for INSERT*
+	/* Must pass a treeview_node struct pointer for INSERT*
 	 * If WIDGET_NOOP is returned here then the operation was invalid and the
 	 * passed node should be freed to avoid leaks. */
 	TREEVIEW_INSERT,		/* Add a child node to the selected node. */
 	TREEVIEW_INSERT_PARENT, /* Add a node to the selected node's parent. */
+	/* Jump to a node, pass a pointer to a treeview struct parent->nodes[index]
+	 */
+	TREEVIEW_JUMP,
 	TREEVIEW_DELETE, /* Delete the selected node along with it's children. The
 						root node cannot be deleted. */
 };
@@ -1091,6 +1094,40 @@ treeview_event(struct treeview *treeview, enum treeview_event event, ...) {
 			if (!treeview->selected) {
 				treeview->selected = nnode;
 			}
+
+			return WIDGET_REDRAW;
+		}
+	case TREEVIEW_JUMP:
+		{
+			va_list vl = {0};
+			va_start(vl, event);
+			/* https://bugs.llvm.org/show_bug.cgi?id=41311
+			 * NOLINTNEXTLINE(clang-analyzer-valist.Uninitialized) */
+			struct treeview_node *nnode = va_arg(vl, struct treeview_node *);
+			va_end(vl);
+
+			if (!nnode) {
+				break;
+			}
+
+			assert(nnode->parent);
+
+			bool found = false;
+
+			for (size_t i = 0, len = arrlenu(nnode->parent->nodes); i < len;
+				 i++) {
+				if (nnode->parent->nodes[i] == nnode) {
+					found = true;
+					nnode->parent->index = i;
+
+					if (nnode->parent->parent) {
+						treeview_event(treeview, TREEVIEW_JUMP, nnode->parent);
+					}
+				}
+			}
+
+			assert(found);
+			treeview->selected = nnode;
 
 			return WIDGET_REDRAW;
 		}
