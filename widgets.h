@@ -971,7 +971,9 @@ treeview_finish(struct treeview *treeview) {
 
 void
 treeview_redraw(struct treeview *treeview, struct widget_points *points) {
-	if (!treeview || !treeview->selected || !points) {
+	if (!treeview || !treeview->selected || !points
+		|| !(widget_points_in_bounds(points, points->x1, points->y1))
+		|| (points->y2 - points->y1) <= 1) {
 		return;
 	}
 
