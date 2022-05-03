@@ -1114,6 +1114,15 @@ treeview_event(struct treeview *treeview, enum treeview_event event, ...) {
 
 			bool found = false;
 
+			if (treeview->selected) {
+				while (treeview->selected->parent) {
+					treeview->selected->parent->index = 0;
+					treeview->selected = treeview->selected->parent;
+				}
+
+				treeview->selected = NULL;
+			}
+
 			for (size_t i = 0, len = arrlenu(nnode->parent->nodes); i < len;
 				 i++) {
 				if (nnode->parent->nodes[i] == nnode) {
@@ -1123,6 +1132,8 @@ treeview_event(struct treeview *treeview, enum treeview_event event, ...) {
 					if (nnode->parent->parent) {
 						treeview_event(treeview, TREEVIEW_JUMP, nnode->parent);
 					}
+
+					break;
 				}
 			}
 
