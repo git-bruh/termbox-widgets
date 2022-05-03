@@ -975,11 +975,13 @@ treeview_redraw(struct treeview *treeview, struct widget_points *points) {
 		return;
 	}
 
+	/* -1 as the root node is not visible. */
 	int selected_height = node_height_bottom_to_up(treeview->selected) - 1;
+
 	assert(selected_height > 0);
 
 	int diff_forward
-	  = selected_height - (treeview->start_y + (points->y2 - points->y1));
+	  = (1 + selected_height) - (treeview->start_y + (points->y2 - points->y1));
 	int diff_backward = treeview->start_y - (selected_height - 1);
 
 	if (diff_backward > 0) {
