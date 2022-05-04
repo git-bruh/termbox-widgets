@@ -972,8 +972,7 @@ treeview_finish(struct treeview *treeview) {
 void
 treeview_redraw(struct treeview *treeview, struct widget_points *points) {
 	if (!treeview || !treeview->selected || !points
-		|| !(widget_points_in_bounds(points, points->x1, points->y1))
-		|| (points->y2 - points->y1) <= 1) {
+		|| !(widget_points_in_bounds(points, points->x1, points->y1))) {
 		return;
 	}
 
@@ -983,7 +982,7 @@ treeview_redraw(struct treeview *treeview, struct widget_points *points) {
 	assert(selected_height > 0);
 
 	int diff_forward
-	  = (1 + selected_height) - (treeview->start_y + (points->y2 - points->y1));
+	  = selected_height - (treeview->start_y + (points->y2 - points->y1));
 	int diff_backward = treeview->start_y - (selected_height - 1);
 
 	if (diff_backward > 0) {
