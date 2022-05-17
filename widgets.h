@@ -84,7 +84,8 @@ void
 input_finish(struct input *input);
 /* rows will be filled with the number of rows taken by the input field. */
 void
-input_redraw(struct input *input, struct widget_points *points, int *rows);
+input_redraw(
+  struct input *input, struct widget_points *points, int *rows, bool dry_run);
 enum widget_error
 input_handle_event(struct input *input, enum input_event event, ...);
 char *
@@ -491,7 +492,8 @@ input_finish(struct input *input) {
 }
 
 void
-input_redraw(struct input *input, struct widget_points *points, int *rows) {
+input_redraw(
+  struct input *input, struct widget_points *points, int *rows, bool dry_run) {
 	if (!rows) {
 		return;
 	}
@@ -507,6 +509,12 @@ input_redraw(struct input *input, struct widget_points *points, int *rows) {
 	size_t buf_len = arrlenu(input->buf);
 
 	if (input->scroll_horizontal) {
+		*rows = 1;
+
+		if (dry_run) {
+			return;
+		}
+
 		int width = 0;
 		int max_width = points->x2 - points->x1;
 		int start_width = -1;
@@ -557,7 +565,6 @@ input_redraw(struct input *input, struct widget_points *points, int *rows) {
 			assert((widget_points_in_bounds(points, x, points->y1)));
 		}
 
-		*rows = 1;
 		return;
 	}
 
@@ -633,7 +640,10 @@ input_redraw(struct input *input, struct widget_points *points, int *rows) {
 				: (points->y1 + (cur_line - (input->start_y + 1)));
 
 	assert((widget_points_in_bounds(points, cur_x, cur_y)));
-	tb_set_cursor(cur_x, cur_y);
+
+	if (!dry_run) {
+		tb_set_cursor(cur_x, cur_y);
+	}
 
 	for (int x = points->x1; written < buf_len; written++) {
 		if (line >= lines || (y - input->start_y) >= points->y2) {
@@ -647,7 +657,7 @@ input_redraw(struct input *input, struct widget_points *points, int *rows) {
 		line += widget_advance_xy_if_scroll(&x, &y, points, width);
 
 		/* Don't print newlines directly as they mess up the screen. */
-		if (!widget_should_forcebreak(width)) {
+		if (!widget_should_forcebreak(width) && !dry_run) {
 			tb_set_cell(x, y - input->start_y, uc, TB_DEFAULT, input->bg);
 		}
 
