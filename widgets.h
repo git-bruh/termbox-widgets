@@ -1293,11 +1293,11 @@ main(void) {
 		int rows = 0;
 
 		assert(input_init(&input, TB_DEFAULT, false) == 0);
-		input_redraw(&input, &points, &rows);
+		input_redraw(&input, &points, &rows, false);
 		assert(rows == 1);
 
 		input.scroll_horizontal = true;
-		input_redraw(&input, &points, &rows);
+		input_redraw(&input, &points, &rows, false);
 		assert(rows == 1);
 
 		input.scroll_horizontal = false;
@@ -1307,11 +1307,11 @@ main(void) {
 		}
 
 		assert(input_handle_event(&input, INPUT_ADD, ' ') == WIDGET_NOOP);
-		input_redraw(&input, &points, &rows);
+		input_redraw(&input, &points, &rows, false);
 		assert(rows == 24);
 
 		input.scroll_horizontal = true;
-		input_redraw(&input, &points, &rows);
+		input_redraw(&input, &points, &rows, false);
 		assert(rows == 1);
 		input.scroll_horizontal = false;
 
